@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAM luminarias · Presupuestador (Mockup)</title>
+<!-- Librerías vendorizadas localmente para funcionar 100% offline -->
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0d0d0f; --surface:#16161a; --surface-2:#1e1e24; --line:#2a2a32;
+    --text:#ececec; --muted:#9a9aa6; --accent:#d9a441; --accent-soft:#3a2f1a;
+    --ok:#5fb878; --danger:#c2554d; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px; line-height:1.45;
+  }
+  .muted{color:var(--muted)}
+  .demo-badge{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent);
+    font-size:11px; padding:2px 8px; border-radius:99px; letter-spacing:.04em}
+
+  /* ---------- Top bar ---------- */
+  header.topbar{position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:16px;
+    padding:13px 22px; background:#0d0d0f; border-bottom:1px solid var(--line)}
+  .brand{display:flex; align-items:center; gap:12px}
+  .brand .logo{width:38px;height:38px;flex:0 0 38px}
+  .brand .name{font-weight:600; letter-spacing:.18em; font-size:15px}
+  .brand .name small{display:block; font-weight:400; letter-spacing:.30em; font-size:9px; color:var(--muted); margin-top:2px}
+  .spacer{flex:1}
+  .toolbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  button{font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--text); padding:9px 13px; transition:.15s}
+  button:hover{border-color:var(--accent); color:#fff}
+  button.primary{background:var(--accent); color:#1a1407; border-color:var(--accent); font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent}
+  .seg{display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden}
+  .seg button{border:0; border-radius:0; background:transparent; padding:8px 13px}
+  .seg button.on{background:var(--accent); color:#1a1407; font-weight:600}
+
+  /* ---------- Cabecera (barra) ---------- */
+  .cab-bar{display:flex; flex-wrap:wrap; gap:10px; padding:12px 22px; border-bottom:1px solid var(--line); background:var(--surface)}
+  .field{flex:1 1 150px}
+  .field.sm{flex:0 1 130px}
+  .field label{display:block; font-size:10.5px; color:var(--muted); margin-bottom:3px; letter-spacing:.04em}
+  .req{color:var(--accent)}
+  input,select{font:inherit; background:var(--surface-2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%}
+  input:focus,select:focus{outline:none; border-color:var(--accent)}
+
+  /* ---------- Layout: catálogo GRANDE + carrito ---------- */
+  main{display:grid; grid-template-columns:1fr 360px; gap:0; min-height:calc(100vh - 130px)}
+  @media(max-width:880px){ main{grid-template-columns:1fr} }
+  .catalogo{padding:18px 22px}
+  .carrito{border-left:1px solid var(--line); background:var(--surface); padding:16px 16px 24px;
+    position:sticky; top:64px; align-self:start; max-height:calc(100vh - 64px); overflow:auto}
+  @media(max-width:880px){ .carrito{position:static; max-height:none; border-left:0; border-top:1px solid var(--line)} }
+  h2.sec{margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:600}
+
+  /* ---------- Buscador ---------- */
+  .searchbar{display:flex; gap:10px; align-items:center; margin-bottom:8px}
+  .searchbar .grow{flex:1; position:relative}
+  .searchbar .grow input{padding-left:38px; height:46px; font-size:15px}
+  .searchbar .grow svg{position:absolute; left:12px; top:13px; opacity:.6}
+  .searchbar select{width:auto; min-width:190px; height:46px}
+  .reslabel{font-size:12px; color:var(--muted); margin:4px 0 14px}
+
+  /* ---------- Galería de productos (GRANDE) ---------- */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:14px}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px;
+    display:flex; flex-direction:column; gap:8px; transition:.15s}
+  .card:hover{border-color:var(--accent); transform:translateY(-2px)}
+  .thumb{height:120px; border-radius:10px; display:grid; place-items:center;
+    background:radial-gradient(circle at 50% 35%, #2c2c34, #131318); border:1px solid var(--line)}
+  .pname{font-weight:600; font-size:14px; line-height:1.3}
+  .pmeta{font-size:11.5px; color:var(--muted)}
+  .cprice{font-size:13px; margin-top:2px}
+  .cprice b{font-size:15px}
+  .cmeta{font-size:10.5px; color:var(--muted)}
+  .pill{display:inline-block; font-size:10px; padding:1px 7px; border-radius:99px; border:1px solid var(--line); color:var(--muted)}
+  .pill.idea{color:#9ec5ff;border-color:#2f4366}
+  .pill.cam{color:var(--accent);border-color:#54451f}
+  .pill.artelum{color:#b6e3c4;border-color:#2f5740}
+  .addbtn{margin-top:auto; background:var(--accent); color:#1a1407; font-weight:600; border-color:var(--accent); text-align:center}
+  .addbtn:hover{filter:brightness(1.08); color:#1a1407}
+  .empty{padding:30px; text-align:center; color:var(--muted)}
+
+  /* ---------- Carrito (lista plana) ---------- */
+  .cart-item{display:grid; grid-template-columns:34px 1fr auto; gap:9px; align-items:center;
+    padding:9px 4px; border-top:1px solid var(--line)}
+  .cart-item:first-child{border-top:0}
+  .cart-item .ci-thumb{width:34px;height:34px;border-radius:7px;display:grid;place-items:center;
+    background:radial-gradient(circle at 50% 35%, #2c2c34, #131318); border:1px solid var(--line)}
+  .ci-name{font-size:12.5px; font-weight:600; line-height:1.25}
+  .ci-ref{font-size:10.5px; color:var(--muted)}
+  .ci-right{text-align:right}
+  .stepper{display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:8px; overflow:hidden}
+  .stepper button{border:0; background:var(--surface-2); padding:3px 9px; color:var(--text)}
+  .stepper button:hover{background:var(--accent); color:#1a1407}
+  .stepper input{width:34px; text-align:center; border:0; background:transparent; padding:3px 0}
+  .ci-sub{font-weight:600; font-size:12.5px; margin-top:4px}
+  .ci-rm{display:block; margin:2px 0 0 auto; color:var(--muted); border:0; background:transparent; padding:2px 5px; font-size:11px}
+  .ci-rm:hover{color:var(--danger)}
+  .cart-empty{padding:26px 10px; text-align:center; color:var(--muted); font-size:13px;
+    border:1px dashed var(--line); border-radius:10px}
+
+  /* ---------- Markup + pago + totales ---------- */
+  .markup-box{background:var(--accent-soft); border:1px solid var(--accent); border-radius:10px; padding:11px 12px; margin:14px 0 10px}
+  .markup-box label{display:block; font-size:11px; color:var(--accent); letter-spacing:.04em; margin-bottom:6px; font-weight:600}
+  .markup-box .mrow{display:flex; align-items:center; gap:8px}
+  .markup-box input{width:90px; border-color:var(--accent)}
+  .markup-box .hint{font-size:10.5px; color:var(--muted); margin-top:6px}
+  .pay{margin-top:6px; border-top:1px solid var(--line); padding-top:12px}
+  .pay-row{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .pay-row label{flex:1; color:var(--muted); font-size:12px}
+  .pay-row input{width:96px}
+  .pay-row.iva input{width:70px}
+  .sum-box{margin-top:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:13px}
+  .sum-line{display:flex; justify-content:space-between; padding:4px 0; font-size:13px}
+  .sum-line.big{border-top:1px solid var(--line); margin-top:6px; padding-top:9px; font-size:16px; font-weight:700}
+  .sum-line.accent{color:var(--accent)}
+  .sum-line .v{font-variant-numeric:tabular-nums}
+  .note{background:var(--surface-2); border:1px dashed var(--line); border-radius:9px; padding:9px 11px; font-size:11.5px; color:var(--muted); margin-top:12px}
+  footer{padding:18px 22px; text-align:center; color:var(--muted); font-size:12px; border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M24 7 L33 24 H15 Z" stroke="#d9a441" stroke-width="1.6" fill="#1e1e24"/>
+      <line x1="24" y1="24" x2="24" y2="36" stroke="#d9a441" stroke-width="1.6"/>
+      <line x1="17" y1="36" x2="31" y2="36" stroke="#d9a441" stroke-width="1.6"/>
+      <ellipse cx="24" cy="40" rx="9" ry="2.4" fill="#d9a441" opacity="0.18"/>
+      <circle cx="24" cy="25.5" r="1.5" fill="#d9a441"/>
+    </svg>
+    <div class="name">CAM<small>LUMINARIAS</small></div>
+  </div>
+  <span class="demo-badge">MOCKUP · DEMO</span>
+  <div class="spacer"></div>
+  <div class="toolbar">
+    <span class="muted" style="font-size:11px; letter-spacing:.04em">EXPORTAR</span>
+    <button onclick="exportPDF('cliente')" class="primary" title="PDF para enviar al cliente (precios de venta, sin costos ni marca)">⬇ PDF cliente</button>
+    <button onclick="exportPDF('interno')" title="PDF interno (costos, markup y ganancia)">⬇ PDF interno</button>
+    <button onclick="exportExcel('cliente')" title="Excel para el cliente (simplificado)">⬇ Excel cliente</button>
+    <button onclick="exportExcel('interno')" title="Excel interno (costos y ganancia)">⬇ Excel interno</button>
+  </div>
+</header>
+
+<!-- Datos del cliente (barra) -->
+<div class="cab-bar">
+  <div class="field"><label>Cliente <span class="req">*</span></label><input id="cab-cliente" placeholder="Nombre y apellido"></div>
+  <div class="field sm"><label>Teléfono <span class="req">*</span></label><input id="cab-telefono" placeholder="+54 …"></div>
+  <div class="field"><label>Obra</label><input id="cab-obra" placeholder="Nombre de la obra"></div>
+  <div class="field sm"><label>Vendedor</label><input id="cab-vendedor" placeholder="Quién atiende"></div>
+  <div class="field sm"><label>Fecha</label><input id="cab-fecha" type="date"></div>
+  <div class="field sm"><label>N°</label><input id="cab-nro" placeholder="P-0001"></div>
+</div>
+
+<main>
+  <!-- ============ CATÁLOGO (grande) ============ -->
+  <section class="catalogo">
+    <div class="searchbar">
+      <div class="grow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9a9aa6" stroke-width="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#9a9aa6" stroke-width="2"/></svg>
+        <input id="search" type="text" placeholder="Buscar producto por nombre…" oninput="renderCatalogo()">
+      </div>
+      <!-- El filtro por proveedor es solo para el vendedor: el cliente no debe verlo -->
+      <select id="filtroProv" class="vendor-only" onchange="renderCatalogo()">
+        <option value="">Todos los proveedores</option>
+      </select>
+    </div>
+    <div id="reslabel" class="reslabel"></div>
+    <div id="catGrid" class="grid"></div>
+  </section>
+
+  <!-- ============ CARRITO ============ -->
+  <aside class="carrito">
+    <h2 class="sec">🛒 Presupuesto</h2>
+    <div id="cartItems"></div>
+
+    <!-- Markup del vendedor (se aplica sobre el costo) -->
+    <div class="markup-box vendor-only">
+      <label>Markup del vendedor (%)</label>
+      <div class="mrow">
+        <input id="markup" type="number" min="0" step="5" value="100" oninput="onMarkup()">
+        <span class="muted" style="font-size:12px">sobre el costo</span>
+      </div>
+      <div class="hint">Los precios de las listas son de <b>costo</b>. El markup arma el precio de venta. <span id="markupEjemplo"></span></div>
+    </div>
+
+    <!-- Forma de pago -->
+    <div class="pay">
+      <select id="pago-forma" onchange="onFormaPago()">
+        <option value="lista|0">Precio de lista / Cta. corriente</option>
+        <option value="transferencia|10">Transferencia (−10%)</option>
+        <option value="efectivo|15">Efectivo (−15%)</option>
+      </select>
+      <div class="pay-row" style="margin-top:8px"><label>Descuento (%)</label><input id="pago-desc" type="number" min="0" max="100" step="0.5" value="0" oninput="renderTotalesOnly()"></div>
+      <div class="pay-row"><label>Adelanto / Seña</label><input id="pago-adelanto" type="number" min="0" step="1000" value="0" oninput="renderTotalesOnly()"></div>
+      <div class="pay-row iva vendor-only"><label>IVA (%)</label><input id="pago-iva" type="number" min="0" max="100" step="0.5" value="21" oninput="renderTotalesOnly()"></div>
+    </div>
+
+    <div class="sum-box" id="sumBox"></div>
+
+    <div style="display:flex; gap:8px; margin-top:12px">
+      <button class="ghost" style="flex:1" onclick="cargarEjemplo()">Cargar ejemplo</button>
+      <button class="ghost" style="flex:1" onclick="limpiar()">Limpiar</button>
+    </div>
+    <div class="note vendor-only">Lógica: <b>costo</b> = precio de lista del proveedor (con tu descuento de compra) · <b>venta</b> = costo + markup · IVA aparte · descuento por forma de pago sobre el total.</div>
+  </aside>
+</main>
+
+<footer>
+  Mockup del <b>Presupuestador CAM luminarias</b> · precios de demostración · estética y flujo orientativos.
+</footer>
+
+<script>
+/* =====================================================================
+   DATOS DE MUESTRA
+   - descuentoCompra: descuento del proveedor para llegar al COSTO real.
+   - El precio de venta lo arma el MARKUP del vendedor (editable, global).
+===================================================================== */
+const PROVEEDORES = {
+  IDEA:    { nombre:'IDEA Iluminación', descuentoCompra:0.20, clase:'idea' },
+  CAM:     { nombre:'CAM (fabricación propia)', descuentoCompra:0.00, clase:'cam' },
+  ARTELUM: { nombre:'Artelum', descuentoCompra:0.15, clase:'artelum' },
+};
+
+const CATALOGO = [
+  // ---------- IDEA (códigos reales de la lista N°95) ----------
+  { prov:'IDEA', codigo:'90.AB44.824150.01', interno:'IDEA · Driver SLIM 150W TRIAC 5 en 1',
+    desc:'Fuente regulable lineal de 150W, 24V, regulación TRIAC',
+    specs:'150W · 24V · IP20 · TRIAC 5 en 1 · 146×35×25mm', lista:182000 },
+  { prov:'IDEA', codigo:'90.AB44.524150.01', interno:'IDEA · Driver SLIM 150W DALI',
+    desc:'Fuente regulable lineal de 150W, 24V, protocolo DALI',
+    specs:'150W · 24V · IP20 · DALI · 190×42×28mm', lista:214000 },
+  { prov:'IDEA', codigo:'90.AB44.824036.01', interno:'IDEA · Driver SLIM 36W TRIAC',
+    desc:'Fuente regulable compacta de 36W, 24V',
+    specs:'36W · 24V · IP20 · TRIAC · 247×46×32mm', lista:64500 },
+  { prov:'IDEA', codigo:'90.AB44.024030.00', interno:'IDEA · Driver 30W ON/OFF',
+    desc:'Fuente 30W, 24V, encendido on/off',
+    specs:'30W · 24V · IP20 · ON/OFF · 270×34×18.5mm', lista:38900 },
+  { prov:'IDEA', codigo:'10.FE20.060090.27', interno:'IDEA · FEDRO 2.0 6W MINI',
+    desc:'Proyector mini orientable, luz cálida, alto rendimiento (CRI 90)',
+    specs:'6W · 2700/3000/4000K · CRI 90 · 28°/39°/50° · 110 lm/W', lista:96500 },
+  { prov:'IDEA', codigo:'10.CR20.090090.30', interno:'IDEA · CROLL 2.0 proyector',
+    desc:'Proyector de embutir orientable, bajo deslumbramiento (UGR<20)',
+    specs:'9W · 3000K · CRI 90 · 48° · UGR<20', lista:128000 },
+  { prov:'IDEA', codigo:'20.LN20.230090.00', interno:'IDEA · LINO TRIMLESS perfil',
+    desc:'Perfil lineal de embutir sin marco para iluminación indirecta',
+    specs:'23W/m · 2700/3000/4000K · CRI 90 · IP20 · 31×35mm · 1330 lm/m', lista:154000 },
+  { prov:'IDEA', codigo:'20.LN12.120090.00', interno:'IDEA · LINO APLIQUE',
+    desc:'Aplique lineal de luz indirecta, fuente integrada',
+    specs:'12W/m · 2700/3000/4000K · CRI 90 · IP20 · 1326 lm/m', lista:99000 },
+  { prov:'IDEA', codigo:'60.TS16.200067.30', interno:'IDEA · Tira LED siliconada exterior',
+    desc:'Tira LED flexible para exteriores, sin puntos visibles',
+    specs:'16W/m · 2700/3000K · IP67 · 24V · 200 lm/m · corte 50mm', lista:42500 },
+  { prov:'IDEA', codigo:'30.WP06.060090.27', interno:'IDEA · WIPI cabezal magnético',
+    desc:'Cabezal magnético orientable para riel, luz cálida',
+    specs:'6W · 2700K · CRI 90 · 36° · sistema magnético 48V', lista:58000 },
+
+  // ---------- CAM (fabricación propia) ----------
+  { prov:'CAM', codigo:'CAM-COL-ARB-R11', interno:'CAM · Colgante "Árbol" c/ cabezal R11',
+    desc:'Colgante de diseño a medida con cabezal orientable, terminación a elección',
+    specs:'A medida · cabezal R11 · regulable · terminación cuero/metal', lista:140000 },
+  { prov:'CAM', codigo:'CAM-SPOT-R5', interno:'CAM · Spot embutido R5',
+    desc:'Spot embutido a medida, foco direccional oculto',
+    specs:'Embutido R5 · orientable · diseño sin marco', lista:46000 },
+  { prov:'CAM', codigo:'CAM-APL-CUERO45', interno:'CAM · Aplique revestido en cuero (tira 45°)',
+    desc:'Aplique de pared revestido en cuero con tira LED a 45°',
+    specs:'Tira LED 45° · revestimiento cuero · largo a medida', lista:88000 },
+  { prov:'CAM', codigo:'CAM-PLAF-LIN', interno:'CAM · Plafón lineal a medida',
+    desc:'Plafón lineal de superficie, largo y terminación a medida',
+    specs:'Superficie · largo a medida · luz indirecta', lista:72000 },
+
+  // ---------- ARTELUM (tercer proveedor) ----------
+  { prov:'ARTELUM', codigo:'ART-PLAF-18', interno:'Artelum · Plafón redondo LED 18W',
+    desc:'Plafón redondo de superficie LED 18W, luz neutra',
+    specs:'18W · 4000K · Ø220mm · IP20', lista:34000 },
+  { prov:'ARTELUM', codigo:'ART-COL-DEC', interno:'Artelum · Colgante decorativo',
+    desc:'Colgante decorativo metálico, portalámpara E27',
+    specs:'E27 · metal negro · altura regulable', lista:52000 },
+  { prov:'ARTELUM', codigo:'ART-APL-EXT', interno:'Artelum · Aplique de pared exterior',
+    desc:'Aplique exterior up/down, aluminio, apto intemperie',
+    specs:'2×6W · 3000K · IP54 · aluminio', lista:41000 },
+  { prov:'ARTELUM', codigo:'ART-EMB-AR111', interno:'Artelum · Embutido AR111',
+    desc:'Embutido AR111 orientable para acento',
+    specs:'GU10/AR111 · orientable · blanco/negro', lista:38500 },
+];
+
+/* =====================================================================
+   ESTADO  (carrito plano, sin ambientes)
+===================================================================== */
+let uidCounter = 1;
+const state = { vista:'vendedor', items:[] };   // items: {uid, codigo, cantidad}
+
+/* ---------- precios ---------- */
+function prodByCodigo(cod){ return CATALOGO.find(p=>p.codigo===cod); }
+function markupPct(){ return parseFloat(document.getElementById('markup').value)||0; }
+function costoReal(p){ const pr=PROVEEDORES[p.prov]; return p.lista*(1-pr.descuentoCompra); }
+function precioVenta(p){ return costoReal(p)*(1+markupPct()/100); }
+const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
+const money = n => fmt.format(Math.round(n||0));
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function lampSVG(s){ s=s||24; return `<svg width="${s}" height="${s}" viewBox="0 0 48 48" fill="none">
+  <path d="M24 9 L32 24 H16 Z" stroke="#d9a441" stroke-width="1.6" fill="none"/>
+  <line x1="24" y1="24" x2="24" y2="34" stroke="#6a6a74" stroke-width="1.4"/>
+  <circle cx="24" cy="25" r="1.3" fill="#d9a441"/></svg>`; }
+
+/* =====================================================================
+   CATÁLOGO (galería grande, búsqueda por nombre)
+===================================================================== */
+function initFiltro(){
+  const sel=document.getElementById('filtroProv');
+  Object.keys(PROVEEDORES).forEach(k=>{
+    const o=document.createElement('option'); o.value=k; o.textContent=PROVEEDORES[k].nombre; sel.appendChild(o);
+  });
+}
+function renderCatalogo(){
+  const q=(document.getElementById('search').value||'').toLowerCase().trim();
+  const fp=document.getElementById('filtroProv').value;
+  const grid=document.getElementById('catGrid'); grid.innerHTML='';
+  const list=CATALOGO.filter(p=>{
+    if(fp && p.prov!==fp) return false;
+    if(!q) return true;
+    return (p.codigo+' '+p.interno+' '+p.desc+' '+p.specs).toLowerCase().includes(q);
+  });
+  list.forEach(p=>{
+    const pr=PROVEEDORES[p.prov];
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`
+      <div class="thumb">${lampSVG(40)}</div>
+      <div class="pname">${p.desc}</div>
+      <div class="pmeta">${p.specs}</div>
+      <div class="cprice">Costo <b>${money(costoReal(p))}</b></div>
+      <div class="cmeta"><span class="pill ${pr.clase}">${p.prov}</span> ${p.codigo} · lista ${money(p.lista)}</div>
+      <button class="addbtn" onclick="addItem('${p.codigo}')">+ Agregar al presupuesto</button>`;
+    grid.appendChild(card);
+  });
+  document.getElementById('reslabel').textContent =
+    `${list.length} producto${list.length!==1?'s':''}${q?` para “${q}”`:''}`;
+  if(!list.length) grid.innerHTML='<div class="empty">Sin resultados. Probá con otro nombre.</div>';
+}
+
+/* =====================================================================
+   CARRITO (lista plana)
+===================================================================== */
+function addItem(codigo){
+  const ex=state.items.find(i=>i.codigo===codigo);
+  if(ex){ ex.cantidad++; } else { state.items.push({uid:'i'+(uidCounter++), codigo, cantidad:1}); }
+  renderCarrito(); renderTotalesOnly();
+}
+function removeItem(uid){ state.items=state.items.filter(i=>i.uid!==uid); renderCarrito(); renderTotalesOnly(); }
+function stepQty(uid,delta){
+  const it=state.items.find(i=>i.uid===uid); if(!it) return;
+  it.cantidad=Math.max(1,(it.cantidad||1)+delta); renderCarrito(); renderTotalesOnly();
+}
+function setQty(uid,val){
+  const it=state.items.find(i=>i.uid===uid); if(!it) return;
+  let n=parseInt(val,10); if(isNaN(n)||n<1) n=1; it.cantidad=n;
+  const p=prodByCodigo(it.codigo);
+  const sub=document.querySelector(`[data-sub="${uid}"]`); if(sub) sub.textContent=money(precioVenta(p)*n);
+  renderTotalesOnly();
+}
+function renderCarrito(){
+  const cont=document.getElementById('cartItems'); cont.innerHTML='';
+  if(!state.items.length){
+    cont.innerHTML='<div class="cart-empty">El carrito está vacío.<br>Buscá productos a la izquierda y tocá <b>“+ Agregar”</b>.</div>';
+    return;
+  }
+  cont.innerHTML=state.items.map(item=>{
+    const p=prodByCodigo(item.codigo); const pv=precioVenta(p);
+    return `<div class="cart-item">
+      <div class="ci-thumb">${lampSVG(18)}</div>
+      <div>
+        <div class="ci-name">${p.desc}</div>
+        <div class="ci-ref vendor-only">${p.interno}</div>
+        <div class="stepper" style="margin-top:5px">
+          <button onclick="stepQty('${item.uid}',-1)">−</button>
+          <input type="number" min="1" value="${item.cantidad}" onchange="setQty('${item.uid}',this.value)">
+          <button onclick="stepQty('${item.uid}',1)">+</button>
+        </div>
+      </div>
+      <div class="ci-right">
+        <div class="ci-sub" data-sub="${item.uid}">${money(pv*item.cantidad)}</div>
+        <button class="ci-rm" onclick="removeItem('${item.uid}')">✕ quitar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* =====================================================================
+   TOTALES
+===================================================================== */
+function calcular(){
+  let subtotal=0, costoTotal=0;
+  state.items.forEach(it=>{
+    const p=prodByCodigo(it.codigo);
+    subtotal+=precioVenta(p)*it.cantidad; costoTotal+=costoReal(p)*it.cantidad;
+  });
+  const iva=parseFloat(document.getElementById('pago-iva').value)||0;
+  const ivaMonto=subtotal*iva/100; const totalConIva=subtotal+ivaMonto;
+  const descPct=parseFloat(document.getElementById('pago-desc').value)||0;
+  const descMonto=totalConIva*descPct/100; const totalPagar=totalConIva-descMonto;
+  const adelanto=parseFloat(document.getElementById('pago-adelanto').value)||0;
+  const saldo=totalPagar-adelanto; const ganancia=subtotal-costoTotal;
+  return {subtotal,iva,ivaMonto,totalConIva,descPct,descMonto,totalPagar,adelanto,saldo,costoTotal,ganancia};
+}
+function renderTotalesOnly(){
+  const t=calcular();
+  document.getElementById('sumBox').innerHTML=`
+    <div class="sum-line"><span>Subtotal neto</span><span class="v">${money(t.subtotal)}</span></div>
+    <div class="sum-line"><span>IVA (${t.iva}%)</span><span class="v">${money(t.ivaMonto)}</span></div>
+    <div class="sum-line"><span>Total c/IVA</span><span class="v">${money(t.totalConIva)}</span></div>
+    ${t.descPct>0?`<div class="sum-line accent"><span>Desc. forma de pago (−${t.descPct}%)</span><span class="v">−${money(t.descMonto)}</span></div>`:''}
+    <div class="sum-line big"><span>Total a pagar</span><span class="v">${money(t.totalPagar)}</span></div>
+    ${t.adelanto>0?`<div class="sum-line"><span>Adelanto / Seña</span><span class="v">−${money(t.adelanto)}</span></div>
+    <div class="sum-line big accent"><span>Saldo</span><span class="v">${money(t.saldo)}</span></div>`:''}
+    <div class="vendor-only" style="margin-top:9px;border-top:1px dashed var(--line);padding-top:7px">
+      <div class="sum-line"><span class="muted">Costo total (interno)</span><span class="v muted">${money(t.costoTotal)}</span></div>
+      <div class="sum-line"><span class="muted">Ganancia bruta (s/IVA)</span><span class="v" style="color:var(--ok)">${money(t.ganancia)}</span></div>
+    </div>`;
+}
+function onFormaPago(){
+  const [,pct]=document.getElementById('pago-forma').value.split('|');
+  document.getElementById('pago-desc').value=pct; renderTotalesOnly();
+}
+function onMarkup(){
+  // las cards quedan fijas en COSTO; el markup solo afecta el carrito y los totales (precio de venta)
+  renderCarrito(); renderTotalesOnly();
+  document.getElementById('markupEjemplo').textContent =
+    `Ej.: costo $100.000 → venta ${money(100000*(1+markupPct()/100))}.`;
+}
+
+/* =====================================================================
+   CABECERA helpers
+===================================================================== */
+function getCab(){ return {
+  cliente:val('cab-cliente'), telefono:val('cab-telefono'), obra:val('cab-obra'),
+  vendedor:val('cab-vendedor'), fecha:val('cab-fecha'), nro:val('cab-nro') }; }
+function val(id){ return (document.getElementById(id).value||'').trim(); }
+function fechaLinda(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+
+/* =====================================================================
+   EXPORT PDF (brochure cliente, 1 clic)
+===================================================================== */
+function exportPDF(modo){
+  modo = modo||'cliente'; const interno = modo==='interno';
+  const cab=getCab();
+  if(!cab.cliente){ alert('Cargá al menos el nombre del cliente.'); document.getElementById('cab-cliente').focus(); return; }
+  if(!state.items.length){ alert('Agregá al menos un producto al presupuesto.'); return; }
+  const t=calcular(); const m=markupPct();
+  const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297, accent=[217,164,65], dark=[13,13,15], muted=[140,140,150];
+
+  // ---- Portada ----
+  doc.setFillColor(...dark); doc.rect(0,0,W,H,'F');
+  doc.setDrawColor(...accent); doc.setLineWidth(0.6); doc.line(20,52,W-20,52); doc.line(20,150,W-20,150);
+  doc.setLineWidth(0.8); doc.triangle(105,78,98,92,112,92,'S'); doc.line(105,92,105,104); doc.line(99,104,111,104);
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(40); doc.text('CAM',105,124,{align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(...accent); doc.text('L U M I N A R I A S',105,133,{align:'center'});
+  doc.setTextColor(220,220,225); doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.text('PRESUPUESTO',105,180,{align:'center'});
+  if(interno){ doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...accent); doc.text('· USO INTERNO ·',105,189,{align:'center'}); }
+  doc.setFont('helvetica','normal'); doc.setFontSize(12);
+  let cy=202; const linea=(k,v)=>{ if(!v) return; doc.setTextColor(...muted); doc.text(k,70,cy);
+    doc.setTextColor(235,235,240); doc.text(String(v),105,cy); cy+=9; };
+  linea('Cliente',cab.cliente); linea('Obra',cab.obra); linea('Fecha',fechaLinda(cab.fecha)); linea('Vendedor',cab.vendedor); linea('N°',cab.nro);
+  doc.setFontSize(9); doc.setTextColor(120,120,130); doc.text('Presupuesto generado con el sistema CAM luminarias',105,285,{align:'center'});
+
+  // ---- Detalle ----
+  doc.addPage(); doc.setTextColor(30,30,30);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.text(interno?'Detalle interno (costos)':'Detalle del presupuesto',14,20);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(110,110,110);
+  doc.text(`${cab.cliente}${cab.obra?' · '+cab.obra:''}${cab.fecha?' · '+fechaLinda(cab.fecha):''}`,14,27);
+
+  let head, body, colStyles;
+  if(interno){
+    head=[['Producto (ref. interna)','Cant.','Costo u.','Venta u.','Subtotal']];
+    body=state.items.map(it=>{ const p=prodByCodigo(it.codigo); const pv=precioVenta(p);
+      return [{content:p.interno+'\n'+p.desc,styles:{cellWidth:78}},
+        {content:String(it.cantidad),styles:{halign:'center'}},
+        {content:money(costoReal(p)),styles:{halign:'right'}},
+        {content:money(pv),styles:{halign:'right'}},
+        {content:money(pv*it.cantidad),styles:{halign:'right'}}]; });
+    colStyles={0:{cellWidth:78},1:{cellWidth:16,halign:'center'},2:{cellWidth:28,halign:'right'},3:{cellWidth:28,halign:'right'},4:{cellWidth:32,halign:'right'}};
+  } else {
+    head=[['Descripción','Cant.','P. Unitario','Subtotal']];
+    body=state.items.map(it=>{ const p=prodByCodigo(it.codigo); const pv=precioVenta(p);
+      return [{content:p.desc+'\n'+p.specs,styles:{cellWidth:96}},
+        {content:String(it.cantidad),styles:{halign:'center'}},
+        {content:money(pv),styles:{halign:'right'}},
+        {content:money(pv*it.cantidad),styles:{halign:'right'}}]; });
+    colStyles={0:{cellWidth:96},1:{cellWidth:18,halign:'center'},2:{cellWidth:34,halign:'right'},3:{cellWidth:34,halign:'right'}};
+  }
+  doc.autoTable({ startY:33, head, body, theme:'grid',
+    styles:{fontSize:9.5,cellPadding:3,lineColor:[225,225,225],textColor:[40,40,40]},
+    headStyles:{fillColor:[26,26,30],textColor:[240,240,240],halign:'center'},
+    columnStyles:colStyles, margin:{left:14,right:14} });
+
+  let y=doc.lastAutoTable.finalY+8; const xL=118,xR=196;
+  const tline=(k,v,opt={})=>{ doc.setFont('helvetica',opt.bold?'bold':'normal'); doc.setFontSize(opt.big?12:10);
+    doc.setTextColor(...(opt.accent?[170,120,20]:[60,60,60])); doc.text(k,xL,y); doc.text(v,xR,y,{align:'right'}); y+=opt.big?8:6.5; };
+  if(y>246){ doc.addPage(); y=20; }
+  if(interno){
+    tline('Costo total',money(t.costoTotal));
+    tline('Markup aplicado', m+'%');
+    tline('Subtotal venta (neto)',money(t.subtotal));
+    tline(`IVA (${t.iva}%)`,money(t.ivaMonto));
+    tline('Total c/IVA',money(t.totalConIva));
+    if(t.descPct>0) tline(`Descuento forma de pago (−${t.descPct}%)`,'−'+money(t.descMonto),{accent:true});
+    doc.setDrawColor(200,200,200); doc.line(xL,y-3,xR,y-3);
+    tline('TOTAL A PAGAR',money(t.totalPagar),{bold:true,big:true});
+    tline('GANANCIA BRUTA (s/IVA)',money(t.ganancia),{bold:true,big:true,accent:true});
+  } else {
+    tline('Subtotal neto',money(t.subtotal)); tline(`IVA (${t.iva}%)`,money(t.ivaMonto)); tline('Total c/IVA',money(t.totalConIva));
+    if(t.descPct>0) tline(`Descuento forma de pago (−${t.descPct}%)`,'−'+money(t.descMonto),{accent:true});
+    doc.setDrawColor(200,200,200); doc.line(xL,y-3,xR,y-3);
+    tline('TOTAL A PAGAR',money(t.totalPagar),{bold:true,big:true});
+    if(t.adelanto>0){ tline('Adelanto / Seña','−'+money(t.adelanto)); tline('SALDO',money(t.saldo),{bold:true,big:true,accent:true}); }
+  }
+  const fp=document.getElementById('pago-forma').selectedOptions[0].text;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(120,120,120);
+  doc.text('Forma de pago: '+fp,14,y+6);
+  if(!interno) doc.text('Presupuesto válido por 7 días corridos. Precios sujetos a confirmación de stock.',14,y+12);
+  doc.save(`Presupuesto-CAM-${(cab.cliente||'cliente').replace(/\s+/g,'_')}-${modo}.pdf`);
+}
+
+/* =====================================================================
+   EXPORT EXCEL
+===================================================================== */
+function exportExcel(modo){
+  const cab=getCab(); const t=calcular();
+  if(!state.items.length){ alert('Agregá al menos un producto al presupuesto.'); return; }
+  const m=markupPct();
+
+  const aoa=[];
+  aoa.push(['CAM luminarias — Presupuesto'+(modo==='interno'?' (USO INTERNO)':'')]);
+  aoa.push(['Cliente',cab.cliente,'','Obra',cab.obra]);
+  aoa.push(['Teléfono',cab.telefono,'','Vendedor',cab.vendedor]);
+  aoa.push(['Fecha',fechaLinda(cab.fecha),'','N°',cab.nro]); aoa.push([]);
+
+  if(modo==='interno'){
+    aoa.push(['Referencia (marca+código)','Proveedor','Descripción cliente','Cant.','Costo u.','Markup %','P. Venta u.','Subtotal venta']);
+    state.items.forEach(it=>{ const p=prodByCodigo(it.codigo); const pr=PROVEEDORES[p.prov]; const pv=precioVenta(p);
+      aoa.push([p.interno,pr.nombre,p.desc,it.cantidad,Math.round(costoReal(p)),m,Math.round(pv),Math.round(pv*it.cantidad)]); });
+    aoa.push([]);
+    [['Subtotal neto',t.subtotal],[`IVA ${t.iva}%`,t.ivaMonto],['Total c/IVA',t.totalConIva],[`Desc. pago ${t.descPct}%`,-t.descMonto],['TOTAL A PAGAR',t.totalPagar],['Adelanto/Seña',-t.adelanto],['SALDO',t.saldo]]
+      .forEach(([k,v])=>aoa.push(['','','','','','',k,Math.round(v)]));
+    aoa.push([]);
+    [['Costo total',t.costoTotal],['Ganancia bruta',t.ganancia]].forEach(([k,v])=>aoa.push(['','','','','','',k,Math.round(v)]));
+  } else {
+    aoa.push(['Descripción','Cant.','P. Unitario','Subtotal']);
+    state.items.forEach(it=>{ const p=prodByCodigo(it.codigo); const pv=precioVenta(p);
+      aoa.push([p.desc+' · '+p.specs,it.cantidad,Math.round(pv),Math.round(pv*it.cantidad)]); });
+    aoa.push([]);
+    aoa.push(['','','Subtotal neto',Math.round(t.subtotal)]);
+    aoa.push(['','',`IVA ${t.iva}%`,Math.round(t.ivaMonto)]);
+    aoa.push(['','','Total c/IVA',Math.round(t.totalConIva)]);
+    if(t.descPct>0) aoa.push(['','',`Descuento forma de pago ${t.descPct}%`,-Math.round(t.descMonto)]);
+    aoa.push(['','','TOTAL A PAGAR',Math.round(t.totalPagar)]);
+    if(t.adelanto>0){ aoa.push(['','','Adelanto/Seña',-Math.round(t.adelanto)]); aoa.push(['','','SALDO',Math.round(t.saldo)]); }
+  }
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=(modo==='interno')
+    ? [{wch:30},{wch:20},{wch:36},{wch:7},{wch:13},{wch:9},{wch:13},{wch:14}]
+    : [{wch:54},{wch:7},{wch:14},{wch:14}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,modo==='interno'?'Interno':'Presupuesto');
+  XLSX.writeFile(wb,`Presupuesto-CAM-${(cab.cliente||'cliente').replace(/\s+/g,'_')}-${modo}.xlsx`);
+}
+
+/* =====================================================================
+   EJEMPLO / LIMPIAR / INIT
+===================================================================== */
+function cargarEjemplo(){
+  document.getElementById('cab-cliente').value='Juan Pérez';
+  document.getElementById('cab-telefono').value='+54 9 11 5555-5555';
+  document.getElementById('cab-obra').value='Casa Nordelta';
+  document.getElementById('cab-vendedor').value='Mateo';
+  document.getElementById('cab-nro').value='P-0042';
+  state.items=[]; uidCounter=1;
+  ['20.LN20.230090.00','10.FE20.060090.27','10.FE20.060090.27','90.AB44.824150.01','90.AB44.824036.01','ART-PLAF-18','CAM-COL-ARB-R11']
+    .forEach(addItem);
+  renderCarrito(); renderTotalesOnly();
+}
+function limpiar(){
+  if(!confirm('¿Vaciar el presupuesto?')) return;
+  ['cab-cliente','cab-telefono','cab-obra','cab-vendedor','cab-nro'].forEach(id=>document.getElementById(id).value='');
+  state.items=[]; renderCarrito(); renderTotalesOnly();
+}
+function init(){
+  document.getElementById('cab-fecha').value=new Date().toISOString().slice(0,10);
+  initFiltro(); renderCatalogo(); onMarkup(); cargarEjemplo();
+}
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
