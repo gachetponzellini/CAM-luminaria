@@ -15,6 +15,7 @@
     --ok:#5fb878; --danger:#c2554d; --radius:12px;
   }
   *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
   html,body{margin:0;padding:0}
   body{
     background:var(--bg); color:var(--text);
@@ -128,6 +129,38 @@
   .sum-line .v{font-variant-numeric:tabular-nums}
   .note{background:var(--surface-2); border:1px dashed var(--line); border-radius:9px; padding:9px 11px; font-size:11.5px; color:var(--muted); margin-top:12px}
   footer{padding:18px 22px; text-align:center; color:var(--muted); font-size:12px; border-top:1px solid var(--line)}
+
+  /* ---------- Barra de carrito (solo móvil) ---------- */
+  #mobileCartBar{display:none; position:fixed; left:0; right:0; bottom:0; z-index:40;
+    align-items:center; justify-content:space-between; gap:12px; text-decoration:none;
+    background:var(--accent); color:#1a1407; font-weight:700; padding:14px 18px;
+    box-shadow:0 -6px 18px rgba(0,0,0,.45)}
+  #mobileCartBar .mc-total{font-variant-numeric:tabular-nums; font-size:15px}
+  #carrito{scroll-margin-top:72px}
+
+  /* ---------- Responsive ---------- */
+  @media(max-width:880px){
+    #mobileCartBar{display:flex}
+    body{padding-bottom:68px}
+  }
+  @media(max-width:640px){
+    header.topbar{flex-wrap:wrap; gap:10px; padding:11px 14px; position:static}
+    .brand .name{font-size:14px}
+    .demo-badge, .spacer{display:none}
+    .toolbar{width:100%; gap:6px}
+    .toolbar > span{display:none}
+    .toolbar button{flex:1 1 40%; padding:11px 8px; font-size:12.5px}
+    .cab-bar{padding:11px 14px; gap:8px}
+    .field, .field.sm{flex:1 1 46%}
+    .catalogo{padding:14px 14px}
+    .searchbar{flex-wrap:wrap}
+    .searchbar select{width:100%; min-width:0}
+    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+    .thumb{height:96px}
+    .carrito{padding:16px 14px}
+    /* iOS no hace zoom al enfocar si el input es >=16px */
+    input,select,.searchbar .grow input{font-size:16px}
+  }
 </style>
 </head>
 <body>
@@ -182,7 +215,7 @@
   </section>
 
   <!-- ============ CARRITO ============ -->
-  <aside class="carrito">
+  <aside class="carrito" id="carrito">
     <h2 class="sec">🛒 Presupuesto</h2>
     <div id="cartItems"></div>
 
@@ -217,6 +250,12 @@
     <div class="note vendor-only">Lógica: <b>costo</b> = precio de lista del proveedor (con tu descuento de compra) · <b>venta</b> = costo + markup · IVA aparte · descuento por forma de pago sobre el total.</div>
   </aside>
 </main>
+
+<!-- Acceso al presupuesto en móvil -->
+<a id="mobileCartBar" href="#carrito">
+  <span>🛒 Ver presupuesto · <span id="mcCount">0</span> ít.</span>
+  <span class="mc-total" id="mcTotal">$ 0</span>
+</a>
 
 <footer>
   Mockup del <b>Presupuestador CAM luminarias</b> · precios de demostración · estética y flujo orientativos.
@@ -428,6 +467,8 @@ function renderTotalesOnly(){
       <div class="sum-line"><span class="muted">Costo total (interno)</span><span class="v muted">${money(t.costoTotal)}</span></div>
       <div class="sum-line"><span class="muted">Ganancia bruta (s/IVA)</span><span class="v" style="color:var(--ok)">${money(t.ganancia)}</span></div>
     </div>`;
+  const mc=document.getElementById('mcTotal'); if(mc) mc.textContent=money(t.totalPagar);
+  const cc=document.getElementById('mcCount'); if(cc) cc.textContent=state.items.reduce((a,i)=>a+(i.cantidad||0),0);
 }
 function onFormaPago(){
   const [,pct]=document.getElementById('pago-forma').value.split('|');
