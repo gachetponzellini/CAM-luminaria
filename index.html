@@ -36,7 +36,9 @@
   .spacer{flex:1}
   .toolbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
   .export-dd{position:relative}
-  .export-dd .caret{font-size:11px; opacity:.8}
+  #exportBtn{display:inline-flex; align-items:center; gap:7px}
+  .export-dd .caret{transition:transform .18s ease}
+  .export-dd.open .caret{transform:rotate(180deg)}
   .export-menu{position:absolute; right:0; top:calc(100% + 6px); z-index:50;
     min-width:210px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
     padding:6px; display:none; flex-direction:column; gap:2px; box-shadow:0 12px 32px rgba(0,0,0,.55)}
@@ -55,13 +57,12 @@
   .seg button.on{background:var(--accent); color:#1a1407; font-weight:600}
 
   /* ---------- Cabecera (barra) ---------- */
-  .cab-bar{display:flex; flex-wrap:wrap; gap:10px; padding:12px 22px; border-bottom:1px solid var(--line); background:var(--surface)}
-  .field{flex:1 1 150px}
-  .field.sm{flex:0 1 130px}
+  .cab-bar{display:grid; grid-template-columns:repeat(3,1fr); gap:10px 12px; padding:12px 22px; border-bottom:1px solid var(--line); background:var(--surface)}
+  .field{min-width:0}
   .field label{display:block; font-size:10.5px; color:var(--muted); margin-bottom:3px; letter-spacing:.04em}
   .req{color:var(--accent)}
   input,select{font:inherit; background:var(--surface-2); color:var(--text);
-    border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%}
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%; min-width:0}
   input:focus,select:focus{outline:none; border-color:var(--accent)}
 
   /* ---------- Layout: catálogo GRANDE + carrito ---------- */
@@ -153,14 +154,12 @@
     body{padding-bottom:68px}
   }
   @media(max-width:640px){
-    header.topbar{flex-wrap:wrap; gap:10px; padding:11px 14px; position:static}
+    /* header fijo arriba; logo a la izq, botón Exportar a la derecha (misma fila) */
+    header.topbar{gap:10px; padding:11px 14px}
     .brand .name{font-size:14px}
-    .demo-badge, .spacer{display:none}
-    .toolbar{width:100%; gap:6px}
-    .toolbar > span{display:none}
-    .toolbar button{flex:1 1 40%; padding:11px 8px; font-size:12.5px}
-    .cab-bar{padding:11px 14px; gap:8px}
-    .field, .field.sm{flex:1 1 46%}
+    .demo-badge{display:none}
+    .toolbar{gap:6px}
+    .cab-bar{padding:11px 14px; gap:8px 10px; grid-template-columns:repeat(2,1fr)}
     .catalogo{padding:14px 14px}
     .searchbar{flex-wrap:wrap}
     .searchbar select{width:100%; min-width:0}
@@ -169,8 +168,7 @@
     .carrito{padding:16px 14px}
     /* iOS no hace zoom al enfocar si el input es >=16px */
     input,select,.searchbar .grow input{font-size:16px}
-    /* el menú de exportar se abre hacia la derecha para no salirse de pantalla */
-    .export-menu{left:0; right:auto; min-width:220px}
+    .export-menu{min-width:220px}
   }
 </style>
 </head>
@@ -191,7 +189,7 @@
   <div class="spacer"></div>
   <div class="toolbar">
     <div class="export-dd">
-      <button class="primary" id="exportBtn" onclick="toggleExport(event)" aria-haspopup="true">⬇ Exportar <span class="caret">▾</span></button>
+      <button class="primary" id="exportBtn" onclick="toggleExport(event)" aria-haspopup="true">Exportar <svg class="caret" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="export-menu" id="exportMenu">
         <div class="grp">PDF</div>
         <button onclick="exportPDF('cliente'); closeExport()">📄 Para el cliente</button>
@@ -510,8 +508,8 @@ function fechaLinda(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); retu
 /* =====================================================================
    MENÚ EXPORTAR (desplegable)
 ===================================================================== */
-function toggleExport(e){ e.stopPropagation(); document.getElementById('exportMenu').classList.toggle('open'); }
-function closeExport(){ const m=document.getElementById('exportMenu'); if(m) m.classList.remove('open'); }
+function toggleExport(e){ e.stopPropagation(); const m=document.getElementById('exportMenu'); const open=m.classList.toggle('open'); m.closest('.export-dd').classList.toggle('open',open); }
+function closeExport(){ const m=document.getElementById('exportMenu'); if(m){ m.classList.remove('open'); m.closest('.export-dd').classList.remove('open'); } }
 
 /* =====================================================================
    EXPORT PDF (brochure cliente, 1 clic)
