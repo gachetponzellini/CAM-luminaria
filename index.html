@@ -35,6 +35,15 @@
   .brand .name small{display:block; font-weight:400; letter-spacing:.30em; font-size:9px; color:var(--muted); margin-top:2px}
   .spacer{flex:1}
   .toolbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .export-dd{position:relative}
+  .export-dd .caret{font-size:11px; opacity:.8}
+  .export-menu{position:absolute; right:0; top:calc(100% + 6px); z-index:50;
+    min-width:210px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
+    padding:6px; display:none; flex-direction:column; gap:2px; box-shadow:0 12px 32px rgba(0,0,0,.55)}
+  .export-menu.open{display:flex}
+  .export-menu .grp{font-size:10px; letter-spacing:.10em; text-transform:uppercase; color:var(--muted); padding:8px 10px 3px}
+  .export-menu button{width:100%; text-align:left; background:transparent; border:0; border-radius:7px; padding:10px 12px; color:var(--text)}
+  .export-menu button:hover{background:var(--accent); color:#1a1407}
   button{font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line);
     background:var(--surface-2); color:var(--text); padding:9px 13px; transition:.15s}
   button:hover{border-color:var(--accent); color:#fff}
@@ -160,6 +169,8 @@
     .carrito{padding:16px 14px}
     /* iOS no hace zoom al enfocar si el input es >=16px */
     input,select,.searchbar .grow input{font-size:16px}
+    /* el menú de exportar se abre hacia la derecha para no salirse de pantalla */
+    .export-menu{left:0; right:auto; min-width:220px}
   }
 </style>
 </head>
@@ -179,11 +190,17 @@
   <span class="demo-badge">MOCKUP · DEMO</span>
   <div class="spacer"></div>
   <div class="toolbar">
-    <span class="muted" style="font-size:11px; letter-spacing:.04em">EXPORTAR</span>
-    <button onclick="exportPDF('cliente')" class="primary" title="PDF para enviar al cliente (precios de venta, sin costos ni marca)">⬇ PDF cliente</button>
-    <button onclick="exportPDF('interno')" title="PDF interno (costos, markup y ganancia)">⬇ PDF interno</button>
-    <button onclick="exportExcel('cliente')" title="Excel para el cliente (simplificado)">⬇ Excel cliente</button>
-    <button onclick="exportExcel('interno')" title="Excel interno (costos y ganancia)">⬇ Excel interno</button>
+    <div class="export-dd">
+      <button class="primary" id="exportBtn" onclick="toggleExport(event)" aria-haspopup="true">⬇ Exportar <span class="caret">▾</span></button>
+      <div class="export-menu" id="exportMenu">
+        <div class="grp">PDF</div>
+        <button onclick="exportPDF('cliente'); closeExport()">📄 Para el cliente</button>
+        <button onclick="exportPDF('interno'); closeExport()">📄 Interno (con costos)</button>
+        <div class="grp">Excel</div>
+        <button onclick="exportExcel('cliente'); closeExport()">📊 Para el cliente</button>
+        <button onclick="exportExcel('interno'); closeExport()">📊 Interno (con costos)</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -491,6 +508,12 @@ function val(id){ return (document.getElementById(id).value||'').trim(); }
 function fechaLinda(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 
 /* =====================================================================
+   MENÚ EXPORTAR (desplegable)
+===================================================================== */
+function toggleExport(e){ e.stopPropagation(); document.getElementById('exportMenu').classList.toggle('open'); }
+function closeExport(){ const m=document.getElementById('exportMenu'); if(m) m.classList.remove('open'); }
+
+/* =====================================================================
    EXPORT PDF (brochure cliente, 1 clic)
 ===================================================================== */
 function exportPDF(modo){
@@ -639,6 +662,7 @@ function limpiar(){
 function init(){
   document.getElementById('cab-fecha').value=new Date().toISOString().slice(0,10);
   initFiltro(); renderCatalogo(); onMarkup(); cargarEjemplo();
+  document.addEventListener('click', e=>{ if(!e.target.closest('.export-dd')) closeExport(); });
 }
 window.addEventListener('DOMContentLoaded', init);
 </script>
