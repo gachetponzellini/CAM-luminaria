@@ -64,6 +64,10 @@
   input,select{font:inherit; background:var(--surface-2); color:var(--text);
     border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%; min-width:0}
   input:focus,select:focus{outline:none; border-color:var(--accent)}
+  /* todos los campos de la cabecera con la misma altura (el date difiere en iOS/Safari) */
+  .cab-bar input{height:40px}
+  .cab-bar input[type=date]{-webkit-appearance:none; appearance:none; text-align:left}
+  .cab-bar input[type=date]::-webkit-date-and-time-value{text-align:left; margin:0}
 
   /* ---------- Layout: catálogo GRANDE + carrito ---------- */
   main{display:grid; grid-template-columns:1fr 360px; gap:0; min-height:calc(100vh - 130px)}
